@@ -34,7 +34,7 @@
 
 ### Windows
 
-到 [Releases](../../releases) 下载 `候选提示词-Windows.zip`，解压后双击 `候选提示词.exe`——免安装绿色版。首次运行若提示「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」。压缩包内附一页纸 `使用指南.html`。
+到 [Releases](../../releases) 下载 `PromptStash-Windows.zip`，解压后双击 `候选提示词.exe`——免安装绿色版。首次运行若提示「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」。压缩包内附一页纸 `使用指南.html`。
 
 ### macOS（从源码运行）
 
