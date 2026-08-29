@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>候选提示词 · 使用指南</title>
+<style>
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; max-width: 640px; margin: 32px auto; padding: 0 16px; color: #1d1d1f; line-height: 1.7; }
+  h1 { font-size: 22px; } h2 { font-size: 16px; margin-top: 28px; }
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 16px 0; }
+  .step { background: #eef0ff; border: 1px solid #c5cbf7; border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+  .arrow { color: #4a5af0; font-weight: bold; }
+  .note { background: #fff8e1; border: 1px solid #f0dc9a; border-radius: 8px; padding: 8px 12px; font-size: 13px; margin: 12px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td { border: 1px solid #ddd; padding: 6px 10px; }
+  td:first-child { white-space: nowrap; font-weight: 600; }
+  code { background: #f0f0f2; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>📌 候选提示词 · 使用指南</h1>
+<p>钉在屏幕最前面的 AI 提示词暂存工具：想到下一步任务，先写在这里，要用时点一下复制。</p>
+
+<h2>开始使用</h2>
+<div class="flow">
+  <div class="step">解压整个压缩包</div><span class="arrow">→</span>
+  <div class="step">打开文件夹</div><span class="arrow">→</span>
+  <div class="step">双击 候选提示词.exe</div><span class="arrow">→</span>
+  <div class="step">开始使用</div>
+</div>
+<div class="note">⚠️ 若弹出「Windows 已保护你的电脑」：点 <b>更多信息</b> → <b>仍要运行</b>（仅首次）。<br>
+💡 建议：右键 exe → 发送到 → 桌面快捷方式。不要把 exe 单独拖出文件夹。</div>
+
+<h2>功能速览</h2>
+<table>
+  <tr><td>写提示词</td><td>底部输入框，点「添加」或 <code>Ctrl+Enter</code></td></tr>
+  <tr><td>用提示词</td><td>点卡片正文 → 已复制，去 AI 对话框粘贴即可</td></tr>
+  <tr><td>分组</td><td>左上角下拉菜单：切换 / ✏️ 改名 / ✕ 删除 / ＋ 新建</td></tr>
+  <tr><td>卡片按钮</td><td>✏️ 编辑 · ☆ 收藏（★ 已收藏，再点取消）· ✕ 删除</td></tr>
+  <tr><td>右上角</td><td>⭐ 收藏区 · 🗑️ 回收站（删除的保留 7 天可恢复）· 📌 置顶开关 · ☀️/🌙 主题</td></tr>
+</table>
+
+<h2>数据在哪</h2>
+<p>所有内容自动保存在本机：<code>%APPDATA%\prompt-stash\prompts-data.json</code>，备份拷这一个文件即可。</p>
+</body>
+</html>

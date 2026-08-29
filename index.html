@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>候选提示词</title>
+<style>
+  :root {
+    --bg: #1e1f24;
+    --fg: #e6e6e9;
+    --panel: #2a2b32;
+    --panel-hover: #33343c;
+    --border: #33343c;
+    --muted: #b8b9c0;
+    --muted2: #8a8b93;
+    --hint: #6b6c75;
+    --accent: #4a5af0;
+    --accent-hover: #5a6af8;
+    --input-border: #3a3b43;
+    --btn-hover: #3a3b43;
+    --badge-border: #4a4b53;
+    --card-border: transparent;
+  }
+  body.light {
+    --bg: #f2f2f4;
+    --fg: #1d1d1f;
+    --panel: #ffffff;
+    --panel-hover: #e8e8ec;
+    --border: #d9d9de;
+    --muted: #5f6067;
+    --muted2: #86868b;
+    --hint: #a1a1a6;
+    --input-border: #d0d0d5;
+    --btn-hover: #e4e4e9;
+    --badge-border: #c7c7cc;
+    --card-border: #e2e2e6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    user-select: none;
+  }
+
+  /* 顶栏：分组标签 */
+  #tabbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 8px 6px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .spacer { flex: 1; }
+  #groupWrap { position: relative; min-width: 0; }
+  #groupBtn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 200px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  #groupName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #groupBtn .caret { font-size: 10px; opacity: 0.8; }
+  #groupMenu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 10;
+    min-width: 200px;
+    max-width: 300px;
+    max-height: 320px;
+    overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    padding: 4px;
+  }
+  .menuItem {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--fg);
+  }
+  .menuItem:hover { background: var(--panel-hover); }
+  .menuItem .miName {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .menuItem.current .miName { color: var(--accent); font-weight: 600; }
+  .menuItem .miBtns { display: none; gap: 2px; }
+  .menuItem:hover .miBtns { display: flex; }
+  .menuItem .miBtns button {
+    background: none;
+    border: none;
+    color: var(--muted2);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 2px 3px;
+    border-radius: 4px;
+  }
+  .menuItem .miBtns button:hover { background: var(--btn-hover); color: var(--fg); }
+  .menuNew {
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    border-radius: 0 0 6px 6px;
+  }
+  .tabEdit {
+    width: 90px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: var(--panel);
+    color: var(--fg);
+    font-size: 13px;
+    outline: none;
+    flex-shrink: 0;
+  }
+  .iconBtn {
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .iconBtn:hover { background: var(--panel-hover); }
+  .iconBtn.active { background: var(--accent); color: #fff; }
+  .iconBtn.off { opacity: 0.4; }
+
+  /* 中部列表 */
+  #list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .hint {
+    color: var(--hint);
+    text-align: center;
+    margin-top: 40px;
+    line-height: 1.8;
+    white-space: pre-line;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+  }
+  .cardText {
+    flex: 1;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    max-height: 130px;
+    overflow-y: auto;
+    cursor: pointer;
+    user-select: text;
+  }
+  .cardMeta {
+    font-size: 11px;
+    color: var(--hint);
+    margin-top: 4px;
+  }
+  .usedBadge {
+    font-size: 11px;
+    color: var(--muted2);
+    border: 1px solid var(--badge-border);
+    border-radius: 4px;
+    padding: 0 4px;
+    margin-right: 4px;
+  }
+  .cardEdit {
+    flex: 1;
+    resize: none;
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: var(--fg);
+    padding: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    outline: none;
+    max-height: 200px;
+  }
+  .cardBtns { display: flex; flex-direction: column; gap: 7px; flex-shrink: 0; }
+  .cardBtns button {
+    background: none;
+    border: none;
+    color: var(--muted2);
+    cursor: pointer;
+    font-size: 10px;
+    line-height: 1;
+    padding: 2px 3px;
+    border-radius: 4px;
+  }
+  .cardBtns button:hover { background: var(--btn-hover); color: var(--fg); }
+  .cardBtns button.favOn { color: #f0b429; }
+  .cardBtns button.favOn:hover { color: #f0b429; }
+
+  /* 底部输入区 */
+  #composer {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    padding: 8px;
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+  }
+  #draft {
+    flex: 1;
+    resize: none;
+    height: 64px;
+    background: var(--panel);
+    border: 1px solid var(--input-border);
+    border-radius: 8px;
+    color: var(--fg);
+    padding: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    line-height: 1.5;
+    outline: none;
+  }
+  #draft:focus { border-color: var(--accent); }
+  #addBtn {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  #addBtn:hover { background: var(--accent-hover); }
+
+  /* 复制反馈 */
+  #toast {
+    position: fixed;
+    bottom: 96px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 16px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+  <div id="tabbar">
+    <div id="groupWrap">
+      <button id="groupBtn" title="切换分组"><span id="groupName"></span><span class="caret">▾</span></button>
+      <div id="groupMenu" style="display: none"></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="iconBtn" id="favBtn" title="收藏区">⭐</button>
+    <button class="iconBtn" id="trashBtn" title="回收站（保留 7 天）">🗑️</button>
+    <button class="iconBtn" id="pinBtn" title="置顶开关">📌</button>
+    <button class="iconBtn" id="themeBtn" title="切换主题">☀️</button>
+  </div>
+  <div id="list"></div>
+  <div id="composer">
+    <textarea id="draft" placeholder="写下一条候选提示词…（⌘+Enter 添加）"></textarea>
+    <button id="addBtn">添加</button>
+  </div>
+  <div id="toast"></div>
+
+<script>
+let state = null
+let view = 'group'          // 'group' | 'fav' | 'trash'
+let menuOpen = false        // 分组下拉菜单是否展开
+const TRASH_KEEP_MS = 7 * 24 * 3600 * 1000   // 回收站保留 7 天
+const drafts = {}           // groupId -> 未发送的草稿（仅本次运行内暂存）
+
+const IS_MAC = navigator.platform.toLowerCase().includes('mac')
+const MOD = IS_MAC ? '⌘' : 'Ctrl'
+
+const $ = (id) => document.getElementById(id)
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+const activeGroup = () => state.groups.find(g => g.id === state.activeGroupId) || null
+
+function save() { window.api.saveData(state) }
+
+function toast(msg) {
+  const t = $('toast')
+  t.textContent = msg
+  t.classList.add('show')
+  clearTimeout(toast._timer)
+  toast._timer = setTimeout(() => t.classList.remove('show'), 1200)
+}
+
+async function copyText(text) {
+  await window.api.copyText(text)
+  toast('已复制 ✓')
+}
+
+function applySettings() {
+  document.body.classList.toggle('light', state.theme === 'light')
+  $('themeBtn').textContent = state.theme === 'light' ? '🌙' : '☀️'
+  $('pinBtn').className = 'iconBtn' + (state.pinned ? ' active' : ' off')
+}
+
+function render() {
+  renderTabs()
+  if (view === 'fav') renderFavorites()
+  else if (view === 'trash') renderTrash()
+  else renderGroupList()
+}
+
+function trashItem(kind, text, groupId, groupName, createdAt) {
+  state.trash.push({
+    id: uid(), kind, text,
+    sourceGroupId: groupId, sourceGroup: groupName,
+    createdAt, deletedAt: Date.now(),
+  })
+}
+
+/* 通用：行内文字输入（新建/重命名分组共用），防 Enter+blur 重复提交 */
+function inlineInput({ initial, onDone }) {
+  const input = document.createElement('input')
+  input.className = 'tabEdit'
+  input.value = initial || ''
+  let finished = false
+  const done = (commit) => {
+    if (finished) return
+    finished = true
+    onDone(commit ? input.value.trim() : '')
+  }
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') done(true)
+    if (e.key === 'Escape') done(false)
+  }
+  input.onblur = () => done(true)
+  return input
+}
+
+function renderTabs() {
+  const g = activeGroup()
+  $('groupName').textContent = g ? g.name : '新建分组…'
+  const menu = $('groupMenu')
+  menu.style.display = menuOpen ? 'block' : 'none'
+  menu.textContent = ''
+  if (menuOpen) {
+    for (const grp of state.groups) menu.appendChild(menuRow(grp))
+    const add = document.createElement('div')
+    add.className = 'menuItem menuNew'
+    add.textContent = '＋ 新建分组'
+    add.onclick = (e) => {
+      e.stopPropagation()
+      const input = inlineInput({
+        onDone: (name) => {
+          if (name) {
+            const ng = { id: uid(), name, prompts: [] }
+            state.groups.push(ng)
+            state.activeGroupId = ng.id
+            view = 'group'
+            menuOpen = false
+            save()
+          }
+          render()
+        },
+      })
+      input.placeholder = '分组名'
+      input.onclick = (e2) => e2.stopPropagation()
+      add.replaceWith(input)
+      input.focus()
+    }
+    menu.appendChild(add)
+  }
+  $('favBtn').className = 'iconBtn' + (view === 'fav' ? ' active' : '')
+  $('trashBtn').className = 'iconBtn' + (view === 'trash' ? ' active' : '')
+}
+
+function menuRow(grp) {
+  const row = document.createElement('div')
+  row.className = 'menuItem' + (grp.id === state.activeGroupId ? ' current' : '')
+
+  const name = document.createElement('span')
+  name.className = 'miName'
+  name.textContent = grp.name
+  row.onclick = () => {
+    state.activeGroupId = grp.id
+    view = 'group'
+    menuOpen = false
+    save()
+    render()
+  }
+
+  const btns = document.createElement('span')
+  btns.className = 'miBtns'
+
+  const renameBtn = document.createElement('button')
+  renameBtn.textContent = '✏️'
+  renameBtn.title = '改名'
+  renameBtn.onclick = (e) => {
+    e.stopPropagation()
+    const input = inlineInput({
+      initial: grp.name,
+      onDone: (n) => {
+        if (n) { grp.name = n; save() }
+        render()
+      },
+    })
+    input.onclick = (e2) => e2.stopPropagation()
+    name.replaceWith(input)
+    input.focus()
+    input.select()
+  }
+
+  const delBtn = document.createElement('button')
+  delBtn.textContent = '✕'
+  delBtn.title = '删除分组'
+  delBtn.onclick = (e) => {
+    e.stopPropagation()
+    if (!confirm(`删除分组「${grp.name}」及其所有提示词？`)) return
+    for (const p of grp.prompts) trashItem('prompt', p.text, grp.id, grp.name, p.createdAt)
+    state.groups = state.groups.filter(x => x.id !== grp.id)
+    if (state.activeGroupId === grp.id) state.activeGroupId = state.groups[0]?.id || null
+    delete drafts[grp.id]
+    save()
+    render()
+  }
+
+  btns.append(renameBtn, delBtn)
+  row.append(name, btns)
+  return row
+}
+
+function renderGroupList() {
+  const list = $('list')
+  list.textContent = ''
+  const g = activeGroup()
+
+  $('composer').style.display = g ? 'flex' : 'none'
+  if (g) $('draft').value = drafts[g.id] || ''
+
+  if (!g) {
+    const hint = document.createElement('div')
+    hint.className = 'hint'
+    hint.textContent = '还没有分组\n点左上角菜单新建一个'
+    list.appendChild(hint)
+    return
+  }
+  if (g.prompts.length === 0) {
+    const hint = document.createElement('div')
+    hint.className = 'hint'
+    hint.textContent = '在下方写第一条候选提示词'
+    list.appendChild(hint)
+    return
+  }
+  for (const p of g.prompts) {
+    list.appendChild(promptCard(p, g))
+  }
+}
+
+function promptCard(p, g) {
+  const card = document.createElement('div')
+  card.className = 'card' + (p.used ? ' used' : '')
+
+  const textWrap = document.createElement('div')
+  textWrap.className = 'cardText'
+  textWrap.title = '点击复制'
+  textWrap.textContent = p.text
+  if (p.used) {
+    const meta = document.createElement('div')
+    meta.className = 'cardMeta'
+    const badge = document.createElement('span')
+    badge.className = 'usedBadge'
+    badge.textContent = '已用'
+    meta.appendChild(badge)
+    textWrap.appendChild(meta)
+  }
+  textWrap.onclick = async () => {
+    await copyText(p.text)
+    if (!p.used) {
+      p.used = true
+      save()
+      render()
+    }
+  }
+
+  const btns = document.createElement('div')
+  btns.className = 'cardBtns'
+
+  const editBtn = document.createElement('button')
+  editBtn.textContent = '✏️'
+  editBtn.title = `编辑（${MOD}+Enter 保存，Esc 取消）`
+  editBtn.onclick = () => startEditPrompt(p, textWrap)
+
+  const favBtn = document.createElement('button')
+  const isFav = state.favorites.some(f => f.text === p.text)
+  favBtn.textContent = isFav ? '★' : '☆'
+  favBtn.className = isFav ? 'favOn' : ''
+  favBtn.title = isFav ? '取消收藏' : '收藏'
+  favBtn.onclick = () => {
+    if (isFav) {
+      state.favorites = state.favorites.filter(f => f.text !== p.text)
+      toast('已取消收藏')
+    } else {
+      state.favorites.push({ id: uid(), text: p.text, sourceGroup: g.name, createdAt: Date.now() })
+      toast('已收藏 ★')
+    }
+    save()
+    render()
+  }
+
+  const delBtn = document.createElement('button')
+  delBtn.textContent = '✕'
+  delBtn.title = '删除（进回收站，保留 7 天）'
+  delBtn.onclick = () => {
+    trashItem('prompt', p.text, g.id, g.name, p.createdAt)
+    g.prompts = g.prompts.filter(x => x.id !== p.id)
+    save()
+    render()
+    toast('已移入回收站 🗑️')
+  }
+
+  btns.append(editBtn, favBtn, delBtn)
+  card.append(textWrap, btns)
+  return card
+}
+
+function startEditPrompt(p, textWrap) {
+  const ta = document.createElement('textarea')
+  ta.className = 'cardEdit'
+  ta.value = p.text
+  let finished = false
+  const done = (commit) => {
+    if (finished) return
+    finished = true
+    const t = ta.value.trim()
+    if (commit && t && t !== p.text) {
+      p.text = t
+      p.used = false   // 改过的提示词视为新的待发送
+      save()
+    }
+    render()
+  }
+  ta.onkeydown = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') done(true)
+    if (e.key === 'Escape') done(false)
+  }
+  ta.onblur = () => done(true)
+  textWrap.replaceWith(ta)
+  ta.style.height = Math.min(200, ta.scrollHeight + 4) + 'px'
+  ta.focus()
+  ta.selectionStart = ta.selectionEnd = ta.value.length
+}
+
+function renderFavorites() {
+  const list = $('list')
+  list.textContent = ''
+  $('composer').style.display = 'none'
+
+  if (state.favorites.length === 0) {
+    const hint = document.createElement('div')
+    hint.className = 'hint'
+    hint.textContent = '还没有收藏\n在提示词卡片上点 ⭐ 沉淀到这里'
+    list.appendChild(hint)
+    return
+  }
+  for (const f of [...state.favorites].reverse()) {
+    const card = document.createElement('div')
+    card.className = 'card'
+
+    const textWrap = document.createElement('div')
+    textWrap.className = 'cardText'
+    textWrap.title = '点击复制'
+    textWrap.textContent = f.text
+    const meta = document.createElement('div')
+    meta.className = 'cardMeta'
+    meta.textContent = `来自 ${f.sourceGroup} · ${new Date(f.createdAt).toLocaleDateString()}`
+    textWrap.appendChild(meta)
+    textWrap.onclick = () => copyText(f.text)
+
+    const btns = document.createElement('div')
+    btns.className = 'cardBtns'
+    const delBtn = document.createElement('button')
+    delBtn.textContent = '✕'
+    delBtn.title = '删除收藏（进回收站，保留 7 天）'
+    delBtn.onclick = () => {
+      trashItem('fav', f.text, null, f.sourceGroup, f.createdAt)
+      state.favorites = state.favorites.filter(x => x.id !== f.id)
+      save()
+      render()
+      toast('已移入回收站 🗑️')
+    }
+    btns.appendChild(delBtn)
+
+    card.append(textWrap, btns)
+    list.appendChild(card)
+  }
+}
+
+function renderTrash() {
+  const list = $('list')
+  list.textContent = ''
+  $('composer').style.display = 'none'
+
+  if (state.trash.length === 0) {
+    const hint = document.createElement('div')
+    hint.className = 'hint'
+    hint.textContent = '回收站是空的\n删除的提示词会在这里保留 7 天'
+    list.appendChild(hint)
+    return
+  }
+  for (const t of [...state.trash].reverse()) {
+    const card = document.createElement('div')
+    card.className = 'card'
+
+    const textWrap = document.createElement('div')
+    textWrap.className = 'cardText'
+    textWrap.title = '点击复制'
+    textWrap.textContent = t.text
+    const meta = document.createElement('div')
+    meta.className = 'cardMeta'
+    const daysLeft = Math.max(1, Math.ceil((TRASH_KEEP_MS - (Date.now() - t.deletedAt)) / 86400000))
+    const from = t.kind === 'fav' ? `收藏（来自 ${t.sourceGroup}）` : `来自 ${t.sourceGroup}`
+    meta.textContent = `${from} · ${daysLeft} 天后自动清除`
+    textWrap.appendChild(meta)
+    textWrap.onclick = () => copyText(t.text)
+
+    const btns = document.createElement('div')
+    btns.className = 'cardBtns'
+
+    const restoreBtn = document.createElement('button')
+    restoreBtn.textContent = '↩︎'
+    restoreBtn.title = t.kind === 'fav' ? '恢复到收藏区' : '恢复到原分组'
+    restoreBtn.onclick = () => restoreTrashItem(t)
+
+    const delBtn = document.createElement('button')
+    delBtn.textContent = '✕'
+    delBtn.title = '彻底删除'
+    delBtn.onclick = () => {
+      if (!confirm('彻底删除？无法恢复。')) return
+      state.trash = state.trash.filter(x => x.id !== t.id)
+      save()
+      render()
+    }
+
+    btns.append(restoreBtn, delBtn)
+    card.append(textWrap, btns)
+    list.appendChild(card)
+  }
+}
+
+function restoreTrashItem(t) {
+  state.trash = state.trash.filter(x => x.id !== t.id)
+  if (t.kind === 'fav') {
+    state.favorites.push({ id: uid(), text: t.text, sourceGroup: t.sourceGroup, createdAt: t.createdAt })
+  } else {
+    let g = state.groups.find(x => x.id === t.sourceGroupId)
+      || state.groups.find(x => x.name === t.sourceGroup)
+    if (!g) {
+      g = { id: uid(), name: t.sourceGroup || '已恢复', prompts: [] }
+      state.groups.push(g)
+    }
+    g.prompts.push({ id: uid(), text: t.text, createdAt: t.createdAt, used: false })
+  }
+  save()
+  render()
+  toast('已恢复 ↩︎')
+}
+
+function addPrompt() {
+  const g = activeGroup()
+  if (!g) return
+  const text = $('draft').value.trim()
+  if (!text) return
+  g.prompts.push({ id: uid(), text, createdAt: Date.now(), used: false })
+  drafts[g.id] = ''
+  save()
+  render()
+  $('list').scrollTop = $('list').scrollHeight
+  $('draft').focus()
+}
+
+/* 顶栏按钮 */
+$('groupBtn').onclick = (e) => {
+  e.stopPropagation()
+  menuOpen = !menuOpen
+  render()
+}
+document.addEventListener('click', (e) => {
+  if (menuOpen && !e.target.closest('#groupWrap')) {
+    menuOpen = false
+    render()
+  }
+})
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && menuOpen) {
+    menuOpen = false
+    render()
+  }
+})
+
+$('favBtn').onclick = () => {
+  view = view === 'fav' ? 'group' : 'fav'
+  render()
+}
+
+$('trashBtn').onclick = () => {
+  view = view === 'trash' ? 'group' : 'trash'
+  render()
+}
+
+$('pinBtn').onclick = () => {
+  state.pinned = !state.pinned
+  window.api.setPinned(state.pinned)
+  save()
+  applySettings()
+  toast(state.pinned ? '已置顶 📌' : '已取消置顶')
+}
+
+$('themeBtn').onclick = () => {
+  state.theme = state.theme === 'light' ? 'dark' : 'light'
+  save()
+  applySettings()
+}
+
+$('addBtn').onclick = addPrompt
+$('draft').oninput = () => {
+  const g = activeGroup()
+  if (g) drafts[g.id] = $('draft').value
+}
+$('draft').onkeydown = (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') addPrompt()
+}
+
+/* 初始化 */
+;(async () => {
+  state = await window.api.loadData()
+  if (!state) {
+    state = {
+      version: 1,
+      pinned: true,
+      theme: 'dark',
+      activeGroupId: null,
+      groups: [
+        { id: uid(), name: 'Hermes', prompts: [] },
+        { id: uid(), name: 'Claude Code', prompts: [] },
+      ],
+      favorites: [],
+    }
+    state.activeGroupId = state.groups[0].id
+    save()
+  }
+  // 旧数据补默认设置
+  if (state.pinned === undefined) state.pinned = true
+  if (!state.theme) state.theme = 'dark'
+  if (!state.trash) state.trash = []
+  // 清掉回收站里超过 7 天的
+  const before = state.trash.length
+  state.trash = state.trash.filter(t => Date.now() - t.deletedAt < TRASH_KEEP_MS)
+  if (state.trash.length !== before) save()
+  $('draft').placeholder = `写下一条候选提示词…（${MOD}+Enter 添加）`
+  applySettings()
+  render()
+})()
+</script>
+</body>
+</html>
