@@ -16,6 +16,9 @@ app.on('second-instance', () => {
 
 const dataFile = () => path.join(app.getPath('userData'), 'prompts-data.json')
 
+let expandedH = null                                    // 展开态的内容高度，主进程说了算
+const clampH = (h) => Math.min(Math.max(200, Math.round(h) || 560), 4000)
+
 function loadData() {
   try {
     return JSON.parse(fs.readFileSync(dataFile(), 'utf8'))
@@ -62,16 +65,22 @@ app.whenReady().then(() => {
     const win = BrowserWindow.fromWebContents(e.sender)
     if (win) applyPinned(win, pinned)
   })
-  // 折叠/展开：只改高度，宽度保持不变。折叠时锁住缩放，免得拖出一片空白
+  // 折叠/展开：只改高度，宽度保持不变。
+  // 展开前的高度由主进程量取——渲染层的 innerHeight 要等尺寸变化传回来才更新，
+  // 快速连点折叠/展开时会读到滞后的值，导致记录的高度逐次跑偏。
   ipcMain.handle('window:setHeight', (e, height, resizable) => {
     const win = BrowserWindow.fromWebContents(e.sender)
-    if (!win) return
-    const h = Math.max(1, Math.round(height))
-    const [w] = win.getContentSize()
-    win.setResizable(true)                                   // 先解锁才能改尺寸
-    win.setMinimumSize(300, resizable ? 360 : h)             // 最小高度会夹住 setContentSize，要先放开
-    win.setContentSize(w, h)
-    win.setResizable(!!resizable)
+    if (!win) return null
+    const [w, curH] = win.getContentSize()
+    const asked = Math.max(1, Math.round(height))
+    if (!resizable) {
+      // 只有确实处在展开态（比目标高出一截）时才采信当前高度
+      if (curH > asked + 40) expandedH = clampH(curH)
+    }
+    const target = resizable ? clampH(asked || expandedH || 560) : asked
+    win.setMinimumSize(300, resizable ? 360 : 1)   // 最小高度会夹住 setContentSize，折叠时要先放开
+    win.setContentSize(w, target)
+    return expandedH
   })
   ipcMain.handle('window:ready', (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)

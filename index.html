@@ -347,31 +347,51 @@
   .dateChip.over { color: var(--due-over); }
   .dateChip.today { color: var(--due-today); }
   .dateChip.soon { color: var(--due-soon); }
-  .dateInput {
-    flex-shrink: 0;
-    align-self: flex-start;
-    width: 112px;
-    padding: 1px 3px;
-    border: 1px solid var(--accent);
-    border-radius: 4px;
+  /* 小日历：画在窗口层（fixed），否则会被可滚动的列表区裁掉 */
+  .datePop {
+    position: fixed;
+    z-index: 100;
+    width: 200px;
+    padding: 8px;
     background: var(--panel);
-    color: var(--fg);
-    font-family: inherit;
-    font-size: 10px;
-    outline: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   }
+  .dpHead { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+  .dpTitle { flex: 1; text-align: center; font-size: 12px; color: var(--fg); }
+  .dpNav {
+    width: 20px; height: 20px; padding: 0;
+    border: none; background: none; border-radius: 4px;
+    color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer;
+  }
+  .dpNav:hover { background: var(--btn-hover); color: var(--fg); }
+  .dpGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .dpWeek span { text-align: center; font-size: 10px; color: var(--hint); line-height: 16px; }
+  .dpDay {
+    height: 22px; padding: 0;
+    border: none; background: none; border-radius: 4px;
+    color: var(--fg); font-size: 11px; cursor: pointer;
+  }
+  .dpDay:hover { background: var(--btn-hover); }
+  .dpToday { color: var(--due-today); font-weight: 600; }
+  .dpSel { background: var(--accent); color: var(--on-accent); }
+  .dpSel:hover { background: var(--accent); }
+  .dpFoot {
+    display: flex; align-items: center; gap: 4px;
+    margin-top: 6px; padding-top: 6px;
+    border-top: 1px solid var(--border);
+  }
+  .dpQuick {
+    padding: 3px 6px;
+    border: none; background: none; border-radius: 4px;
+    color: var(--muted); font-size: 11px; cursor: pointer;
+  }
+  .dpQuick:hover { background: var(--btn-hover); color: var(--fg); }
   .cardMeta {
     font-size: 11px;
     color: var(--hint);
     margin-top: 4px;
-  }
-  .usedBadge {
-    font-size: 11px;
-    color: var(--muted2);
-    border: 1px solid var(--badge-border);
-    border-radius: 4px;
-    padding: 0 4px;
-    margin-right: 4px;
   }
   .cardEdit {
     flex: 1;
@@ -547,7 +567,8 @@ async function copyText(text) {
 
 /* 折叠态那行字：只报数，不出现分组名 */
 function collapsedSummary() {
-  const pend = state.groups.reduce((n, g) => n + g.prompts.filter(p => !p.used).length, 0)
+  // 数分组里的全部条数：真正用完的会被直接删掉，留着的就都是没发的
+  const pend = state.groups.reduce((n, g) => n + g.prompts.length, 0)
   const todo = state.todoGroups.reduce((n, g) => n + g.todos.filter(t => !t.done).length, 0)
   const parts = []
   if (pend) parts.push(pend + ' 条待发送')
@@ -555,23 +576,28 @@ function collapsedSummary() {
   return parts.length ? parts.join('  ·  ') : '都处理完了'
 }
 
-function applyCollapsed() {
+function applyCollapsed(capture) {
   document.body.classList.toggle('collapsed', !!state.collapsed)
   if (state.collapsed) {
     // 必须先把摘要文字填进去再量高度：启动时 render() 还没跑，
     // 空行量出来只有内边距的高度，窗口会被压成一条缝。
     $('collapsedBar').textContent = collapsedSummary()
-    window.api.setHeight($('tabbar').offsetHeight, false)
+    window.api.setHeight($('tabbar').offsetHeight, false).then((h) => {
+      // 展开高度由主进程量，这里只负责存盘；启动时的那次不采集，免得覆盖掉记住的值
+      if (capture && h && h !== state.expandedHeight) {
+        state.expandedHeight = h
+        save()
+      }
+    })
   } else {
     window.api.setHeight(state.expandedHeight || 560, true)
   }
 }
 
 function setCollapsed(v) {
-  if (v) state.expandedHeight = window.innerHeight   // 记住折叠前的高度，展开时原样恢复
   state.collapsed = v
   save()
-  applyCollapsed()
+  applyCollapsed(true)
   render()
 }
 
@@ -762,7 +788,7 @@ function renderGroupList() {
 
 function promptCard(p, g) {
   const card = document.createElement('div')
-  card.className = 'card' + (p.used ? ' used' : '') + (p.collapsed ? ' collapsed' : '')
+  card.className = 'card' + (p.collapsed ? ' collapsed' : '')
   card.dataset.id = p.id
 
   const left = buildLeftRail(card, p, g.prompts)
@@ -771,23 +797,7 @@ function promptCard(p, g) {
   textWrap.className = 'cardText' + (p.collapsed ? ' collapsed' : '')
   textWrap.title = '点击复制'
   textWrap.textContent = p.text
-  if (p.used) {
-    const meta = document.createElement('div')
-    meta.className = 'cardMeta'
-    const badge = document.createElement('span')
-    badge.className = 'usedBadge'
-    badge.textContent = '已用'
-    meta.appendChild(badge)
-    textWrap.appendChild(meta)
-  }
-  textWrap.onclick = async () => {
-    await copyText(p.text)
-    if (!p.used) {
-      p.used = true
-      save()
-      render()
-    }
-  }
+  textWrap.onclick = () => copyText(p.text)
 
   const btns = document.createElement('div')
   btns.className = 'cardBtns'
@@ -885,7 +895,7 @@ function todoCard(t, g) {
   textWrap.className = 'cardText' + (t.collapsed ? ' collapsed' : '') + (t.done ? ' doneText' : '')
   textWrap.title = '点击编辑'
   textWrap.textContent = t.text
-  textWrap.onclick = () => startEditPrompt(t, textWrap, true)
+  textWrap.onclick = () => startEditPrompt(t, textWrap)
 
   const chip = dateChip(t)
 
@@ -944,27 +954,116 @@ function dateChip(t) {
   return chip
 }
 
+const ymd = (d) => d.getFullYear() + '-'
+  + String(d.getMonth() + 1).padStart(2, '0') + '-'
+  + String(d.getDate()).padStart(2, '0')
+
+let datePop = null
+
+function closeDatePicker() {
+  if (!datePop) return
+  datePop.remove()
+  datePop = null
+  document.removeEventListener('click', outsideCloseDate)
+}
+function outsideCloseDate(e) {
+  if (datePop && !datePop.contains(e.target)) closeDatePicker()
+}
+
+/* 小日历：打开就停在当月，点一下日子即可；年月只有跨月时才需要动 */
 function openDatePicker(t, chip) {
-  const inp = document.createElement('input')
-  inp.type = 'date'
-  inp.className = 'dateInput'
-  inp.value = t.due || ''
-  let finished = false
-  const done = (commit) => {
-    if (finished) return
-    finished = true
-    if (commit) { t.due = inp.value || undefined; save() }
+  closeDatePicker()
+  const base = t.due ? new Date(t.due + 'T00:00:00') : new Date()
+  let viewY = base.getFullYear(), viewM = base.getMonth()
+
+  const pop = document.createElement('div')
+  pop.className = 'datePop'
+  // 日历内部的点击一律不外传：换月会把内容整个重画，
+  // 被点的按钮届时已不在页面上，外面那个「点到日历之外就关闭」的判断会误判。
+  pop.onclick = (e) => e.stopPropagation()
+  const pick = (iso) => {
+    t.due = iso || undefined
+    save()
+    closeDatePicker()
     render()
   }
-  inp.onchange = () => done(true)
-  inp.onblur = () => done(true)
-  inp.onkeydown = (e) => {
-    if (e.key === 'Escape') done(false)
-    if (e.key === 'Enter') done(true)
+
+  const draw = () => {
+    pop.textContent = ''
+    const head = document.createElement('div')
+    head.className = 'dpHead'
+    const nav = (label, step) => {
+      const b = document.createElement('button')
+      b.className = 'dpNav'
+      b.textContent = label
+      b.onclick = () => {
+        viewM += step
+        if (viewM < 0) { viewM = 11; viewY-- }
+        if (viewM > 11) { viewM = 0; viewY++ }
+        draw()
+      }
+      return b
+    }
+    const title = document.createElement('span')
+    title.className = 'dpTitle'
+    title.textContent = viewY + '年' + (viewM + 1) + '月'
+    head.append(nav('\u2039', -1), title, nav('\u203A', 1))
+
+    const wk = document.createElement('div')
+    wk.className = 'dpGrid dpWeek'
+    for (const w of ['一', '二', '三', '四', '五', '六', '日']) {
+      const c = document.createElement('span')
+      c.textContent = w
+      wk.appendChild(c)
+    }
+
+    const grid = document.createElement('div')
+    grid.className = 'dpGrid'
+    const lead = (new Date(viewY, viewM, 1).getDay() + 6) % 7   // 周一排第一列
+    const days = new Date(viewY, viewM + 1, 0).getDate()
+    const todayIso = ymd(new Date())
+    for (let i = 0; i < lead; i++) grid.appendChild(document.createElement('span'))
+    for (let d = 1; d <= days; d++) {
+      const iso = ymd(new Date(viewY, viewM, d))
+      const cell = document.createElement('button')
+      cell.className = 'dpDay' + (iso === todayIso ? ' dpToday' : '') + (t.due === iso ? ' dpSel' : '')
+      cell.textContent = d
+      cell.onclick = () => pick(iso)
+      grid.appendChild(cell)
+    }
+
+    const foot = document.createElement('div')
+    foot.className = 'dpFoot'
+    const quick = (label, fn) => {
+      const b = document.createElement('button')
+      b.className = 'dpQuick'
+      b.textContent = label
+      b.onclick = fn
+      return b
+    }
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
+    const gap = document.createElement('span'); gap.style.flex = '1'
+    foot.append(
+      quick('今天', () => pick(ymd(new Date()))),
+      quick('明天', () => pick(ymd(tomorrow))),
+      gap,
+      quick('清除', () => pick(null)),
+    )
+
+    pop.append(head, wk, grid, foot)
   }
-  chip.replaceWith(inp)
-  inp.focus()
-  if (inp.showPicker) { try { inp.showPicker() } catch (err) {} }
+
+  draw()
+  document.body.appendChild(pop)
+
+  // 贴着日期标签摆；下方放不下就翻到上方，左右也夹在窗口内
+  const r = chip.getBoundingClientRect()
+  const w = pop.offsetWidth, h = pop.offsetHeight
+  pop.style.left = Math.min(Math.max(4, r.left - w + r.width), innerWidth - w - 4) + 'px'
+  pop.style.top = (r.bottom + 4 + h > innerHeight - 4 ? Math.max(4, r.top - h - 4) : r.bottom + 4) + 'px'
+
+  datePop = pop
+  setTimeout(() => document.addEventListener('click', outsideCloseDate), 0)
 }
 
 /* ---------- 拖动排序（自绘，不用浏览器原生 DnD：原生拖拽会把文字带出窗口，
@@ -1104,7 +1203,7 @@ function endDrag(commit) {
   }
 }
 
-function startEditPrompt(p, textWrap, isTodoItem) {
+function startEditPrompt(p, textWrap) {
   const ta = document.createElement('textarea')
   ta.className = 'cardEdit'
   ta.value = p.text
@@ -1115,7 +1214,6 @@ function startEditPrompt(p, textWrap, isTodoItem) {
     const t = ta.value.trim()
     if (commit && t && t !== p.text) {
       p.text = t
-      if (!isTodoItem) p.used = false   // 改过的提示词视为新的待发送；待办不动完成状态
       save()
     }
     render()
@@ -1244,7 +1342,7 @@ function restoreTrashItem(t) {
       g = { id: uid(), name: t.sourceGroup || '已恢复', prompts: [] }
       state.groups.push(g)
     }
-    g.prompts.push({ id: uid(), text: t.text, createdAt: t.createdAt, used: false })
+    g.prompts.push({ id: uid(), text: t.text, createdAt: t.createdAt })
   }
   save()
   render()
@@ -1257,7 +1355,7 @@ function addPrompt() {
   const text = $('draft').value.trim()
   if (!text) return
   if (isTodo()) g.todos.push({ id: uid(), text, createdAt: Date.now(), done: false })
-  else g.prompts.push({ id: uid(), text, createdAt: Date.now(), used: false })
+  else g.prompts.push({ id: uid(), text, createdAt: Date.now() })
   drafts[g.id] = ''
   save()
   render()
@@ -1279,6 +1377,7 @@ document.addEventListener('click', (e) => {
 })
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return
+  if (datePop) { closeDatePicker(); return }
   if (dragState) { endDrag(false); return }
   if (menuOpen) {
     menuOpen = false
@@ -1378,7 +1477,7 @@ $('draft').onkeydown = (e) => {
   state.trash = state.trash.filter(t => Date.now() - t.deletedAt < TRASH_KEEP_MS)
   if (state.trash.length !== before) save()
   applySettings()
-  applyCollapsed()
+  applyCollapsed(false)
   render()
   window.api.ready()          // 尺寸就位后再让窗口显示，避免闪一下
 })()
