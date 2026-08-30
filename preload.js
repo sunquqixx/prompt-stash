@@ -5,4 +5,6 @@ contextBridge.exposeInMainWorld('api', {
   saveData: (data) => ipcRenderer.invoke('data:save', data),
   copyText: (text) => ipcRenderer.invoke('clipboard:copy', text),
   setPinned: (pinned) => ipcRenderer.invoke('window:setPinned', pinned),
+  setHeight: (h, resizable) => ipcRenderer.invoke('window:setHeight', h, resizable),
+  ready: () => ipcRenderer.invoke('window:ready'),
 })

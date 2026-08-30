@@ -42,10 +42,13 @@ function createWindow() {
     minWidth: 300,
     minHeight: 360,
     alwaysOnTop: pinned,
+    show: false,          // 等界面把折叠状态应用完再显示，避免闪一下大窗口
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   })
+  // 兜底：界面万一没发就绪信号，1.5 秒后也要把窗口显示出来
+  setTimeout(() => { if (!win.isDestroyed() && !win.isVisible()) win.show() }, 1500)
   applyPinned(win, pinned)
   win.setFullScreenable(false)
   win.loadFile('index.html')
@@ -58,6 +61,21 @@ app.whenReady().then(() => {
   ipcMain.handle('window:setPinned', (e, pinned) => {
     const win = BrowserWindow.fromWebContents(e.sender)
     if (win) applyPinned(win, pinned)
+  })
+  // 折叠/展开：只改高度，宽度保持不变。折叠时锁住缩放，免得拖出一片空白
+  ipcMain.handle('window:setHeight', (e, height, resizable) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (!win) return
+    const h = Math.max(1, Math.round(height))
+    const [w] = win.getContentSize()
+    win.setResizable(true)                                   // 先解锁才能改尺寸
+    win.setMinimumSize(300, resizable ? 360 : h)             // 最小高度会夹住 setContentSize，要先放开
+    win.setContentSize(w, h)
+    win.setResizable(!!resizable)
+  })
+  ipcMain.handle('window:ready', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (win && !win.isVisible()) win.show()
   })
   createWindow()
   app.on('activate', () => {

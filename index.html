@@ -67,6 +67,29 @@
     flex-shrink: 0;
   }
   .spacer { flex: 1; }
+  /* 折叠：整窗只剩顶栏一行，里面只有条数摘要；整行可点，再点展开 */
+  #collapsedBar { display: none; }
+  body.collapsed #collapsedBar {
+    display: block;
+    flex: 1;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  body.collapsed #list,
+  body.collapsed #composer,
+  body.collapsed #groupWrap,
+  body.collapsed #modeSwitch,
+  body.collapsed .iconBtn { display: none !important; }
+  body.collapsed #tabbar {
+    border-bottom: none;
+    padding: 7px 12px;
+  }
+  #tabbar { cursor: default; }
+  #tabbar .spacer, body.collapsed #tabbar { cursor: pointer; }
   /* 板块切换：提示词 / 待办 */
   #modeSwitch {
     display: flex;
@@ -437,6 +460,7 @@
 </head>
 <body>
   <div id="tabbar">
+    <div id="collapsedBar"></div>
     <div id="groupWrap">
       <button id="groupBtn" title="切换分组"><span id="groupName"></span><span class="caret">▾</span></button>
       <div id="groupMenu" style="display: none"></div>
@@ -521,6 +545,36 @@ async function copyText(text) {
   toast('已复制')
 }
 
+/* 折叠态那行字：只报数，不出现分组名 */
+function collapsedSummary() {
+  const pend = state.groups.reduce((n, g) => n + g.prompts.filter(p => !p.used).length, 0)
+  const todo = state.todoGroups.reduce((n, g) => n + g.todos.filter(t => !t.done).length, 0)
+  const parts = []
+  if (pend) parts.push(pend + ' 条待发送')
+  if (todo) parts.push(todo + ' 条待办')
+  return parts.length ? parts.join('  ·  ') : '都处理完了'
+}
+
+function applyCollapsed() {
+  document.body.classList.toggle('collapsed', !!state.collapsed)
+  if (state.collapsed) {
+    // 必须先把摘要文字填进去再量高度：启动时 render() 还没跑，
+    // 空行量出来只有内边距的高度，窗口会被压成一条缝。
+    $('collapsedBar').textContent = collapsedSummary()
+    window.api.setHeight($('tabbar').offsetHeight, false)
+  } else {
+    window.api.setHeight(state.expandedHeight || 560, true)
+  }
+}
+
+function setCollapsed(v) {
+  if (v) state.expandedHeight = window.innerHeight   // 记住折叠前的高度，展开时原样恢复
+  state.collapsed = v
+  save()
+  applyCollapsed()
+  render()
+}
+
 function applySettings() {
   document.body.classList.toggle('light', state.theme === 'light')
   $('themeBtn').innerHTML = icon(state.theme === 'light' ? 'moon' : 'sun', 14)
@@ -578,6 +632,7 @@ function renderTabs() {
   }
   // 待办没有收藏概念，隐藏收藏区入口（顺便腾出横向空间）
   $('favBtn').style.display = todo ? 'none' : ''
+  $('collapsedBar').textContent = collapsedSummary()
   $('draft').placeholder = todo
     ? `写下一条待办…（${MOD}+Enter 添加）`
     : `写下一条候选提示词…（${MOD}+Enter 添加）`
@@ -1236,6 +1291,20 @@ $('favBtn').onclick = () => {
   render()
 }
 
+// 点顶栏空白处切换折叠。折叠态整行都是空白，点哪都行。
+// 「点的是不是控件」必须在按下的瞬间就判定：像主题键那样会重画自己图标的按钮，
+// 等 click 冒泡上来时原来的元素已经被换掉，事后再判断会误判成空白。
+let barHitControl = false
+$('tabbar').addEventListener('pointerdown', (e) => {
+  barHitControl = !!e.target.closest('button, #groupWrap, #modeSwitch')
+})
+$('tabbar').onclick = () => {
+  if (state.collapsed) { setCollapsed(false); return }
+  if (menuOpen) return          // 这一下是用来关下拉菜单的，不折叠
+  if (barHitControl) return
+  setCollapsed(true)
+}
+
 $('modeSwitch').onclick = (e) => {
   const b = e.target.closest('button[data-mode]')
   if (!b || b.dataset.mode === state.mode) return
@@ -1309,7 +1378,9 @@ $('draft').onkeydown = (e) => {
   state.trash = state.trash.filter(t => Date.now() - t.deletedAt < TRASH_KEEP_MS)
   if (state.trash.length !== before) save()
   applySettings()
+  applyCollapsed()
   render()
+  window.api.ready()          // 尺寸就位后再让窗口显示，避免闪一下
 })()
 </script>
 </body>
