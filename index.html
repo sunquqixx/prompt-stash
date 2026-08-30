@@ -16,6 +16,9 @@
     --accent: #ffffff;          /* 深色主题下用白底 */
     --accent-hover: #e4e4e8;
     --on-accent: #1e1f24;       /* 白底上的文字 */
+    --due-over: #ff6b6b;        /* 逾期 */
+    --due-today: #ffa94d;       /* 今天 */
+    --due-soon: #ffd43b;        /* 三天内 */
     --input-border: #3a3b43;
     --btn-hover: #3a3b43;
     --badge-border: #4a4b53;
@@ -37,6 +40,9 @@
     --accent: #4a5af0;          /* 浅色主题仍用蓝色 */
     --accent-hover: #5a6af8;
     --on-accent: #ffffff;
+    --due-over: #d92c2c;
+    --due-today: #c26a00;
+    --due-soon: #9a7b00;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -61,12 +67,36 @@
     flex-shrink: 0;
   }
   .spacer { flex: 1; }
+  /* 板块切换：提示词 / 待办 */
+  #modeSwitch {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+    margin-left: 6px;
+    padding: 2px;
+    border-radius: 6px;
+    background: var(--panel);
+  }
+  #modeSwitch button {
+    padding: 3px 8px;
+    border: none;
+    background: none;
+    border-radius: 4px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  #modeSwitch button:hover { background: var(--panel-hover); }
+  #modeSwitch button.on { background: var(--accent); color: var(--on-accent); }
+  #modeSwitch button.on:hover { background: var(--accent); }
   #groupWrap { position: relative; min-width: 0; }
   #groupBtn {
     display: flex;
     align-items: center;
     gap: 6px;
-    max-width: 200px;
+    max-width: 110px;
     padding: 5px 10px;
     border-radius: 6px;
     background: var(--accent);
@@ -263,6 +293,50 @@
     cursor: pointer;
     user-select: text;
   }
+  /* 待办：已完成划线 */
+  .cardText.doneText {
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    color: var(--muted2);
+  }
+  .cardBtns button.doneOn { color: var(--accent); opacity: 1; }
+  /* 待办：到期日小标签 */
+  .dateChip {
+    flex-shrink: 0;
+    align-self: flex-start;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0 4px;
+    border: none;
+    background: none;
+    border-radius: 4px;
+    color: var(--muted2);
+    font-size: 10px;
+    line-height: 1;
+    white-space: nowrap;
+    opacity: 0.4;
+    cursor: pointer;
+  }
+  .dateChip:hover { opacity: 1; background: var(--btn-hover); }
+  .dateChip.set { opacity: 1; }
+  .dateChip.over { color: var(--due-over); }
+  .dateChip.today { color: var(--due-today); }
+  .dateChip.soon { color: var(--due-soon); }
+  .dateInput {
+    flex-shrink: 0;
+    align-self: flex-start;
+    width: 112px;
+    padding: 1px 3px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    background: var(--panel);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 10px;
+    outline: none;
+  }
   .cardMeta {
     font-size: 11px;
     color: var(--hint);
@@ -367,6 +441,10 @@
       <button id="groupBtn" title="切换分组"><span id="groupName"></span><span class="caret">▾</span></button>
       <div id="groupMenu" style="display: none"></div>
     </div>
+    <div id="modeSwitch">
+      <button data-mode="prompt">提示词</button>
+      <button data-mode="todo">待办</button>
+    </div>
     <div class="spacer"></div>
     <button class="iconBtn" id="favBtn" title="收藏区"></button>
     <button class="iconBtn" id="trashBtn" title="回收站（保留 7 天）"></button>
@@ -401,6 +479,8 @@ const ICONS = {
   moon:    '<path d="M11.3 8.7A5.1 5.1 0 015.3 2.7 5.1 5.1 0 1011.3 8.7z"/>',
   restore: '<path d="M2.4 5.6h6.4a3.1 3.1 0 010 6.2H5.8M2.4 5.6L5 3M2.4 5.6L5 8.2"/>',
   close:   '<path d="M3.4 3.4l7.2 7.2M10.6 3.4l-7.2 7.2"/>',
+  check:   '<path d="M2.8 7.4l2.9 2.9 5.5-6.6"/>',
+  calendar:'<rect x="2" y="3" width="10" height="9" rx="1.4"/><path d="M2 5.9h10M4.7 1.8v2M9.3 1.8v2"/>',
 }
 function icon(name, size, filled) {
   return '<svg viewBox="0 0 14 14" width="' + size + '" height="' + size + '" aria-hidden="true"'
@@ -411,6 +491,20 @@ function icon(name, size, filled) {
 const $ = (id) => document.getElementById(id)
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 const activeGroup = () => state.groups.find(g => g.id === state.activeGroupId) || null
+
+/* ---------- 待办板块 ---------- */
+// 时间管理四象限。id 固定，名字可以自己改。
+const QUADRANTS = [
+  { id: 'q1', name: '重要且紧急' },
+  { id: 'q2', name: '重要不紧急' },
+  { id: 'q3', name: '紧急不重要' },
+  { id: 'q4', name: '不重要不紧急' },
+]
+const isTodo = () => state.mode === 'todo'
+const activeTodoGroup = () => state.todoGroups.find(g => g.id === state.activeTodoGroupId) || null
+// 当前板块下「正在看的那一组」和「它底下的条目数组」
+const curGroup = () => (isTodo() ? activeTodoGroup() : activeGroup())
+const curItems = () => { const g = curGroup(); return g ? (isTodo() ? g.todos : g.prompts) : null }
 
 function save() { window.api.saveData(state) }
 
@@ -437,19 +531,20 @@ let lastRenderKey = null
 
 function render() {
   const list = $('list')
-  const key = view + ':' + (state.activeGroupId || '')
+  const key = view + ':' + state.mode + ':' + (isTodo() ? state.activeTodoGroupId : state.activeGroupId)
   const keptScroll = list.scrollTop      // 重建列表会把滚动位置清零，这里存下来还原
   renderTabs()
   if (view === 'fav') renderFavorites()
   else if (view === 'trash') renderTrash()
+  else if (isTodo()) renderTodoList()
   else renderGroupList()
   list.scrollTop = key === lastRenderKey ? keptScroll : 0   // 换视图/换分组才回到顶部
   lastRenderKey = key
 }
 
-function trashItem(kind, text, groupId, groupName, createdAt) {
+function trashItem(kind, text, groupId, groupName, createdAt, due) {
   state.trash.push({
-    id: uid(), kind, text,
+    id: uid(), kind, text, due,
     sourceGroupId: groupId, sourceGroup: groupName,
     createdAt, deletedAt: Date.now(),
   })
@@ -475,13 +570,25 @@ function inlineInput({ initial, onDone }) {
 }
 
 function renderTabs() {
-  const g = activeGroup()
+  const todo = isTodo()
+  const g = curGroup()
   $('groupName').textContent = g ? g.name : '新建分组…'
+  for (const b of $('modeSwitch').children) {
+    b.className = b.dataset.mode === state.mode ? 'on' : ''
+  }
+  // 待办没有收藏概念，隐藏收藏区入口（顺便腾出横向空间）
+  $('favBtn').style.display = todo ? 'none' : ''
+  $('draft').placeholder = todo
+    ? `写下一条待办…（${MOD}+Enter 添加）`
+    : `写下一条候选提示词…（${MOD}+Enter 添加）`
   const menu = $('groupMenu')
   menu.style.display = menuOpen ? 'block' : 'none'
   menu.textContent = ''
-  if (menuOpen) {
-    for (const grp of state.groups) menu.appendChild(menuRow(grp))
+  if (menuOpen && todo) {
+    // 四象限固定 4 个：可改名，不可删除、不可新增
+    for (const grp of state.todoGroups) menu.appendChild(menuRow(grp, true))
+  } else if (menuOpen) {
+    for (const grp of state.groups) menu.appendChild(menuRow(grp, false))
     const add = document.createElement('div')
     add.className = 'menuItem menuNew'
     add.textContent = '＋ 新建分组'
@@ -511,15 +618,19 @@ function renderTabs() {
   $('trashBtn').className = 'iconBtn' + (view === 'trash' ? ' active' : '')
 }
 
-function menuRow(grp) {
+function menuRow(grp, todo) {
+  const cur = todo ? state.activeTodoGroupId : state.activeGroupId
   const row = document.createElement('div')
-  row.className = 'menuItem' + (grp.id === state.activeGroupId ? ' current' : '')
+  row.className = 'menuItem' + (grp.id === cur ? ' current' : '')
 
   const name = document.createElement('span')
   name.className = 'miName'
-  name.textContent = grp.name
+  name.textContent = todo
+    ? grp.name + '  ' + grp.todos.filter(t => !t.done).length   // 未完成条数
+    : grp.name
   row.onclick = () => {
-    state.activeGroupId = grp.id
+    if (todo) state.activeTodoGroupId = grp.id
+    else state.activeGroupId = grp.id
     view = 'group'
     menuOpen = false
     save()
@@ -561,7 +672,8 @@ function menuRow(grp) {
     render()
   }
 
-  btns.append(renameBtn, delBtn)
+  if (todo) btns.append(renameBtn)          // 四象限固定，不给删除
+  else btns.append(renameBtn, delBtn)
   row.append(name, btns)
   return row
 }
@@ -598,25 +710,7 @@ function promptCard(p, g) {
   card.className = 'card' + (p.used ? ' used' : '') + (p.collapsed ? ' collapsed' : '')
   card.dataset.id = p.id
 
-  const left = document.createElement('div')
-  left.className = 'cardLeft'
-
-  const handle = document.createElement('div')
-  handle.className = 'dragHandle'
-  handle.textContent = '⠿'
-  handle.title = '按住拖动排序'
-  handle.onpointerdown = (e) => startDrag(e, card, g)
-
-  const collapseBtn = document.createElement('button')
-  collapseBtn.className = 'collapseBtn'
-  collapseBtn.textContent = p.collapsed ? '▸' : '▾'
-  collapseBtn.title = p.collapsed ? '展开' : '折叠'
-  collapseBtn.onclick = () => {
-    p.collapsed = !p.collapsed
-    save()
-    render()
-  }
-  left.append(handle, collapseBtn)
+  const left = buildLeftRail(card, p, g.prompts)
 
   const textWrap = document.createElement('div')
   textWrap.className = 'cardText' + (p.collapsed ? ' collapsed' : '')
@@ -683,16 +777,151 @@ function promptCard(p, g) {
   return card
 }
 
+/* 卡片左栏：拖拽把手 + 折叠键（提示词和待办共用） */
+function buildLeftRail(card, item, arr) {
+  const left = document.createElement('div')
+  left.className = 'cardLeft'
+
+  const handle = document.createElement('div')
+  handle.className = 'dragHandle'
+  handle.textContent = '\u283F'
+  handle.title = '按住拖动排序'
+  handle.onpointerdown = (e) => startDrag(e, card, arr)
+
+  const collapseBtn = document.createElement('button')
+  collapseBtn.className = 'collapseBtn'
+  collapseBtn.textContent = item.collapsed ? '\u25B8' : '\u25BE'
+  collapseBtn.title = item.collapsed ? '展开' : '折叠'
+  collapseBtn.onclick = () => {
+    item.collapsed = !item.collapsed
+    save()
+    render()
+  }
+  left.append(handle, collapseBtn)
+  return left
+}
+
+/* ---------- 待办事项 ---------- */
+function renderTodoList() {
+  const list = $('list')
+  list.textContent = ''
+  const g = activeTodoGroup()
+  $('composer').style.display = 'flex'
+  $('draft').value = drafts[g.id] || ''
+
+  if (!g.todos.length) {
+    const hint = document.createElement('div')
+    hint.className = 'hint'
+    hint.textContent = '「' + g.name + '」还没有待办\n在下方写第一条'
+    list.appendChild(hint)
+    return
+  }
+  for (const t of g.todos) list.appendChild(todoCard(t, g))
+}
+
+function todoCard(t, g) {
+  const card = document.createElement('div')
+  card.className = 'card' + (t.collapsed ? ' collapsed' : '')
+  card.dataset.id = t.id
+
+  const left = buildLeftRail(card, t, g.todos)
+
+  const textWrap = document.createElement('div')
+  textWrap.className = 'cardText' + (t.collapsed ? ' collapsed' : '') + (t.done ? ' doneText' : '')
+  textWrap.title = '点击编辑'
+  textWrap.textContent = t.text
+  textWrap.onclick = () => startEditPrompt(t, textWrap, true)
+
+  const chip = dateChip(t)
+
+  const btns = document.createElement('div')
+  btns.className = 'cardBtns'
+
+  const doneBtn = document.createElement('button')
+  doneBtn.innerHTML = icon('check', 11)
+  doneBtn.className = t.done ? 'doneOn' : ''
+  doneBtn.title = t.done ? '标记为未完成' : '标记为已完成'
+  doneBtn.onclick = () => {
+    t.done = !t.done
+    save()
+    render()
+  }
+
+  const delBtn = document.createElement('button')
+  delBtn.innerHTML = icon('close', 11)
+  delBtn.title = '删除（进回收站，保留 7 天）'
+  delBtn.onclick = () => {
+    trashItem('todo', t.text, g.id, g.name, t.createdAt, t.due)
+    g.todos = g.todos.filter(x => x.id !== t.id)
+    save()
+    render()
+    toast('已移入回收站')
+  }
+
+  // 折叠时只留「完成」，把卡片压到一行高
+  if (t.collapsed) btns.append(doneBtn)
+  else btns.append(doneBtn, delBtn)
+
+  card.append(left, textWrap, chip, btns)
+  return card
+}
+
+/* 到期日：小标签 + 系统原生日历 */
+function daysUntil(due) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const d = new Date(due + 'T00:00:00')
+  return Math.round((d - today) / 86400000)
+}
+
+function dateChip(t) {
+  const chip = document.createElement('button')
+  let cls = 'dateChip', label = ''
+  if (t.due) {
+    const n = daysUntil(t.due)
+    const d = new Date(t.due + 'T00:00:00')
+    label = n === 0 ? '今天' : n === 1 ? '明天' : (d.getMonth() + 1) + '/' + d.getDate()
+    cls += ' set' + (n < 0 ? ' over' : n === 0 ? ' today' : n <= 3 ? ' soon' : '')
+  }
+  chip.className = cls
+  chip.title = t.due ? '点击改到期日（清空即取消）' : '设置到期日'
+  chip.innerHTML = icon('calendar', 10) + (label ? '<span>' + label + '</span>' : '')
+  chip.onclick = (e) => { e.stopPropagation(); openDatePicker(t, chip) }
+  return chip
+}
+
+function openDatePicker(t, chip) {
+  const inp = document.createElement('input')
+  inp.type = 'date'
+  inp.className = 'dateInput'
+  inp.value = t.due || ''
+  let finished = false
+  const done = (commit) => {
+    if (finished) return
+    finished = true
+    if (commit) { t.due = inp.value || undefined; save() }
+    render()
+  }
+  inp.onchange = () => done(true)
+  inp.onblur = () => done(true)
+  inp.onkeydown = (e) => {
+    if (e.key === 'Escape') done(false)
+    if (e.key === 'Enter') done(true)
+  }
+  chip.replaceWith(inp)
+  inp.focus()
+  if (inp.showPicker) { try { inp.showPicker() } catch (err) {} }
+}
+
 /* ---------- 拖动排序（自绘，不用浏览器原生 DnD：原生拖拽会把文字带出窗口，
    在这个永远置顶的小窗里等于往下层的 AI 对话框里粘贴内容） ---------- */
 let dragState = null
 
-function startDrag(e, card, g) {
+function startDrag(e, card, arr) {
   if (e.button !== 0 || dragState) return
   e.preventDefault()
   const list = $('list')
   dragState = {
-    card, g, list,
+    card, arr, list,
     listRect: list.getBoundingClientRect(),   // 拖动中列表本身不会动，量一次就够
     startY: e.clientY,
     lastY: e.clientY,
@@ -803,23 +1032,24 @@ function endDrag(commit) {
   s.list.classList.remove('dragging-active')
   s.card.style.transform = ''
   s.card.classList.remove('dragging')
-  const { moved, g, list } = s
+  const { moved, arr, list } = s
   dragState = null
 
   if (commit === false) { render(); return }   // Esc 取消：按未改动的数组重建
   if (!moved) return
 
-  const byId = new Map(g.prompts.map(x => [x.id, x]))
+  const byId = new Map(arr.map(x => [x.id, x]))
   const next = [...list.children].map(el => byId.get(el.dataset.id)).filter(Boolean)
-  if (next.length === g.prompts.length) {
-    g.prompts = next
+  if (next.length === arr.length) {
+    arr.length = 0                 // 就地重排，保持数组引用不变
+    arr.push(...next)
     save()
   } else {
     render()   // 对不上就按数据重建，避免顺序错乱
   }
 }
 
-function startEditPrompt(p, textWrap) {
+function startEditPrompt(p, textWrap, isTodoItem) {
   const ta = document.createElement('textarea')
   ta.className = 'cardEdit'
   ta.value = p.text
@@ -830,7 +1060,7 @@ function startEditPrompt(p, textWrap) {
     const t = ta.value.trim()
     if (commit && t && t !== p.text) {
       p.text = t
-      p.used = false   // 改过的提示词视为新的待发送
+      if (!isTodoItem) p.used = false   // 改过的提示词视为新的待发送；待办不动完成状态
       save()
     }
     render()
@@ -914,7 +1144,9 @@ function renderTrash() {
     const meta = document.createElement('div')
     meta.className = 'cardMeta'
     const daysLeft = Math.max(1, Math.ceil((TRASH_KEEP_MS - (Date.now() - t.deletedAt)) / 86400000))
-    const from = t.kind === 'fav' ? `收藏（来自 ${t.sourceGroup}）` : `来自 ${t.sourceGroup}`
+    const from = t.kind === 'fav' ? `收藏（来自 ${t.sourceGroup}）`
+      : t.kind === 'todo' ? `待办（来自 ${t.sourceGroup}）`
+      : `来自 ${t.sourceGroup}`
     meta.textContent = `${from} · ${daysLeft} 天后自动清除`
     textWrap.appendChild(meta)
     textWrap.onclick = () => copyText(t.text)
@@ -945,7 +1177,10 @@ function renderTrash() {
 
 function restoreTrashItem(t) {
   state.trash = state.trash.filter(x => x.id !== t.id)
-  if (t.kind === 'fav') {
+  if (t.kind === 'todo') {
+    const g = state.todoGroups.find(x => x.id === t.sourceGroupId) || state.todoGroups[0]
+    g.todos.push({ id: uid(), text: t.text, createdAt: t.createdAt, done: false, due: t.due })
+  } else if (t.kind === 'fav') {
     state.favorites.push({ id: uid(), text: t.text, sourceGroup: t.sourceGroup, createdAt: t.createdAt })
   } else {
     let g = state.groups.find(x => x.id === t.sourceGroupId)
@@ -962,11 +1197,12 @@ function restoreTrashItem(t) {
 }
 
 function addPrompt() {
-  const g = activeGroup()
+  const g = curGroup()
   if (!g) return
   const text = $('draft').value.trim()
   if (!text) return
-  g.prompts.push({ id: uid(), text, createdAt: Date.now(), used: false })
+  if (isTodo()) g.todos.push({ id: uid(), text, createdAt: Date.now(), done: false })
+  else g.prompts.push({ id: uid(), text, createdAt: Date.now(), used: false })
   drafts[g.id] = ''
   save()
   render()
@@ -1000,6 +1236,16 @@ $('favBtn').onclick = () => {
   render()
 }
 
+$('modeSwitch').onclick = (e) => {
+  const b = e.target.closest('button[data-mode]')
+  if (!b || b.dataset.mode === state.mode) return
+  state.mode = b.dataset.mode
+  view = 'group'          // 从收藏区/回收站切板块时回到列表
+  menuOpen = false
+  save()
+  render()
+}
+
 $('trashBtn').onclick = () => {
   view = view === 'trash' ? 'group' : 'trash'
   render()
@@ -1021,7 +1267,7 @@ $('themeBtn').onclick = () => {
 
 $('addBtn').onclick = addPrompt
 $('draft').oninput = () => {
-  const g = activeGroup()
+  const g = curGroup()
   if (g) drafts[g.id] = $('draft').value
 }
 $('draft').onkeydown = (e) => {
@@ -1036,6 +1282,7 @@ $('draft').onkeydown = (e) => {
       version: 1,
       pinned: true,
       theme: 'dark',
+      mode: 'prompt',
       activeGroupId: null,
       groups: [
         { id: uid(), name: 'Hermes', prompts: [] },
@@ -1050,6 +1297,10 @@ $('draft').onkeydown = (e) => {
   if (state.pinned === undefined) state.pinned = true
   if (!state.theme) state.theme = 'dark'
   if (!state.trash) state.trash = []
+  // 待办板块：老数据文件没有这块，补一份空的（不动任何已有的提示词数据）
+  if (!state.mode) state.mode = 'prompt'
+  if (!state.todoGroups) state.todoGroups = QUADRANTS.map(q => ({ id: q.id, name: q.name, todos: [] }))
+  if (!state.activeTodoGroupId) state.activeTodoGroupId = state.todoGroups[0].id
   $('favBtn').innerHTML = icon('star', 14)
   $('trashBtn').innerHTML = icon('trash', 14)
   $('pinBtn').innerHTML = icon('pin', 14)
@@ -1057,7 +1308,6 @@ $('draft').onkeydown = (e) => {
   const before = state.trash.length
   state.trash = state.trash.filter(t => Date.now() - t.deletedAt < TRASH_KEEP_MS)
   if (state.trash.length !== before) save()
-  $('draft').placeholder = `写下一条候选提示词…（${MOD}+Enter 添加）`
   applySettings()
   render()
 })()
