@@ -13,8 +13,9 @@
     --muted: #b8b9c0;
     --muted2: #8a8b93;
     --hint: #6b6c75;
-    --accent: #4a5af0;
-    --accent-hover: #5a6af8;
+    --accent: #ffffff;          /* 深色主题下用白底 */
+    --accent-hover: #e4e4e8;
+    --on-accent: #1e1f24;       /* 白底上的文字 */
     --input-border: #3a3b43;
     --btn-hover: #3a3b43;
     --badge-border: #4a4b53;
@@ -33,6 +34,9 @@
     --btn-hover: #e4e4e9;
     --badge-border: #c7c7cc;
     --card-border: #e2e2e6;
+    --accent: #4a5af0;          /* 浅色主题仍用蓝色 */
+    --accent-hover: #5a6af8;
+    --on-accent: #ffffff;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -66,7 +70,7 @@
     padding: 5px 10px;
     border-radius: 6px;
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     border: none;
     font-size: 13px;
     cursor: pointer;
@@ -112,6 +116,9 @@
   .menuItem .miBtns { display: none; gap: 2px; }
   .menuItem:hover .miBtns { display: flex; }
   .menuItem .miBtns button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: none;
     border: none;
     color: var(--muted2);
@@ -139,7 +146,10 @@
     flex-shrink: 0;
   }
   .iconBtn {
-    padding: 4px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 6px;
     border-radius: 6px;
     background: none;
     border: none;
@@ -149,13 +159,14 @@
     flex-shrink: 0;
   }
   .iconBtn:hover { background: var(--panel-hover); }
-  .iconBtn.active { background: var(--accent); color: #fff; }
+  .iconBtn.active { background: var(--accent); color: var(--on-accent); }
   .iconBtn.off { opacity: 0.4; }
 
   /* 中部列表 */
   #list {
     flex: 1;
     overflow-y: auto;
+    overflow-anchor: none;   /* 重排卡片时别让浏览器自作主张调整滚动位置 */
     padding: 8px;
     display: flex;
     flex-direction: column;
@@ -177,6 +188,71 @@
     gap: 6px;
     align-items: flex-start;
   }
+  .cardLeft {
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 14px;
+    margin: -2px 0 -2px -4px;
+  }
+  .dragHandle {
+    flex: 1;
+    min-height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    color: var(--muted2);
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0.4;
+    cursor: grab;
+    touch-action: none;
+  }
+  .dragHandle:hover { opacity: 1; background: var(--btn-hover); }
+  .collapseBtn {
+    flex-shrink: 0;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: none;
+    border-radius: 4px;
+    color: var(--muted2);
+    font-size: 9px;
+    line-height: 1;
+    opacity: 0.4;
+    cursor: pointer;
+  }
+  .collapseBtn:hover { opacity: 1; background: var(--btn-hover); }
+  /* 折叠态：内边距收窄、把手缩短，配合右侧只留编辑键，卡片高度砍掉一半以上 */
+  .card.collapsed { padding: 5px 10px; }
+  .card.collapsed .cardLeft { gap: 0; }
+  .card.collapsed .dragHandle { min-height: 11px; font-size: 10px; }
+  .card.collapsed .collapseBtn { height: 10px; }
+  .card.collapsed .cardBtns { gap: 0; }
+  /* 折叠态：只留一行，末尾自动省略号 */
+  .cardText.collapsed {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-height: none;
+  }
+  .card.dragging {
+    position: relative;
+    z-index: 5;
+    cursor: grabbing;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+    border-color: var(--accent);
+    will-change: transform;   /* 交给显卡单独合成，拖动时不必反复重绘阴影 */
+  }
+  .card.dragging .dragHandle { opacity: 1; cursor: grabbing; }
+  #list.dragging-active .cardText { user-select: none; }
   .cardText {
     flex: 1;
     white-space: pre-wrap;
@@ -216,6 +292,9 @@
   }
   .cardBtns { display: flex; flex-direction: column; gap: 7px; flex-shrink: 0; }
   .cardBtns button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: none;
     border: none;
     color: var(--muted2);
@@ -256,7 +335,7 @@
   #addBtn {
     background: var(--accent);
     border: none;
-    color: #fff;
+    color: var(--on-accent);
     border-radius: 8px;
     padding: 8px 12px;
     cursor: pointer;
@@ -272,7 +351,7 @@
     left: 50%;
     transform: translateX(-50%);
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     padding: 6px 14px;
     border-radius: 16px;
     opacity: 0;
@@ -289,10 +368,10 @@
       <div id="groupMenu" style="display: none"></div>
     </div>
     <div class="spacer"></div>
-    <button class="iconBtn" id="favBtn" title="收藏区">⭐</button>
-    <button class="iconBtn" id="trashBtn" title="回收站（保留 7 天）">🗑️</button>
-    <button class="iconBtn" id="pinBtn" title="置顶开关">📌</button>
-    <button class="iconBtn" id="themeBtn" title="切换主题">☀️</button>
+    <button class="iconBtn" id="favBtn" title="收藏区"></button>
+    <button class="iconBtn" id="trashBtn" title="回收站（保留 7 天）"></button>
+    <button class="iconBtn" id="pinBtn" title="置顶开关"></button>
+    <button class="iconBtn" id="themeBtn" title="切换主题"></button>
   </div>
   <div id="list"></div>
   <div id="composer">
@@ -311,6 +390,24 @@ const drafts = {}           // groupId -> 未发送的草稿（仅本次运行�
 const IS_MAC = navigator.platform.toLowerCase().includes('mac')
 const MOD = IS_MAC ? '⌘' : 'Ctrl'
 
+/* 细线条图标：全部用 currentColor 描边，风格与拖拽把手 ⠿、折叠键 ▾ 统一。
+   用 SVG 而非字符，是为了 macOS 和 Windows 上粗细完全一致。 */
+const ICONS = {
+  edit:    '<path d="M9.8 2.2l2 2L4.8 11.2 2.2 11.8l.6-2.6z"/>',
+  star:    '<path d="M7 1.6l1.7 3.4 3.8.6-2.75 2.7.65 3.8L7 10.3 3.6 12.1l.65-3.8L1.5 5.6l3.8-.6z"/>',
+  trash:   '<path d="M2.4 3.6h9.2M5.4 3.6V2h3.2v1.6M3.9 3.6l.55 8.1h5.1l.55-8.1"/>',
+  pin:     '<path d="M4.8 1.8h4.4M7 1.8v3.6M3.4 5.4h7.2M7 5.4v6.8"/>',
+  sun:     '<circle cx="7" cy="7" r="2.5"/><path d="M7 1.3v1.5M7 11.2v1.5M1.3 7h1.5M11.2 7h1.5M3 3l1.05 1.05M9.95 9.95L11 11M11 3L9.95 4.05M4.05 9.95L3 11"/>',
+  moon:    '<path d="M11.3 8.7A5.1 5.1 0 015.3 2.7 5.1 5.1 0 1011.3 8.7z"/>',
+  restore: '<path d="M2.4 5.6h6.4a3.1 3.1 0 010 6.2H5.8M2.4 5.6L5 3M2.4 5.6L5 8.2"/>',
+  close:   '<path d="M3.4 3.4l7.2 7.2M10.6 3.4l-7.2 7.2"/>',
+}
+function icon(name, size, filled) {
+  return '<svg viewBox="0 0 14 14" width="' + size + '" height="' + size + '" aria-hidden="true"'
+    + ' fill="' + (filled ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.25"'
+    + ' stroke-linecap="round" stroke-linejoin="round">' + ICONS[name] + '</svg>'
+}
+
 const $ = (id) => document.getElementById(id)
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 const activeGroup = () => state.groups.find(g => g.id === state.activeGroupId) || null
@@ -327,20 +424,27 @@ function toast(msg) {
 
 async function copyText(text) {
   await window.api.copyText(text)
-  toast('已复制 ✓')
+  toast('已复制')
 }
 
 function applySettings() {
   document.body.classList.toggle('light', state.theme === 'light')
-  $('themeBtn').textContent = state.theme === 'light' ? '🌙' : '☀️'
+  $('themeBtn').innerHTML = icon(state.theme === 'light' ? 'moon' : 'sun', 14)
   $('pinBtn').className = 'iconBtn' + (state.pinned ? ' active' : ' off')
 }
 
+let lastRenderKey = null
+
 function render() {
+  const list = $('list')
+  const key = view + ':' + (state.activeGroupId || '')
+  const keptScroll = list.scrollTop      // 重建列表会把滚动位置清零，这里存下来还原
   renderTabs()
   if (view === 'fav') renderFavorites()
   else if (view === 'trash') renderTrash()
   else renderGroupList()
+  list.scrollTop = key === lastRenderKey ? keptScroll : 0   // 换视图/换分组才回到顶部
+  lastRenderKey = key
 }
 
 function trashItem(kind, text, groupId, groupName, createdAt) {
@@ -426,7 +530,7 @@ function menuRow(grp) {
   btns.className = 'miBtns'
 
   const renameBtn = document.createElement('button')
-  renameBtn.textContent = '✏️'
+  renameBtn.innerHTML = icon('edit', 11)
   renameBtn.title = '改名'
   renameBtn.onclick = (e) => {
     e.stopPropagation()
@@ -444,7 +548,7 @@ function menuRow(grp) {
   }
 
   const delBtn = document.createElement('button')
-  delBtn.textContent = '✕'
+  delBtn.innerHTML = icon('close', 11)
   delBtn.title = '删除分组'
   delBtn.onclick = (e) => {
     e.stopPropagation()
@@ -491,10 +595,31 @@ function renderGroupList() {
 
 function promptCard(p, g) {
   const card = document.createElement('div')
-  card.className = 'card' + (p.used ? ' used' : '')
+  card.className = 'card' + (p.used ? ' used' : '') + (p.collapsed ? ' collapsed' : '')
+  card.dataset.id = p.id
+
+  const left = document.createElement('div')
+  left.className = 'cardLeft'
+
+  const handle = document.createElement('div')
+  handle.className = 'dragHandle'
+  handle.textContent = '⠿'
+  handle.title = '按住拖动排序'
+  handle.onpointerdown = (e) => startDrag(e, card, g)
+
+  const collapseBtn = document.createElement('button')
+  collapseBtn.className = 'collapseBtn'
+  collapseBtn.textContent = p.collapsed ? '▸' : '▾'
+  collapseBtn.title = p.collapsed ? '展开' : '折叠'
+  collapseBtn.onclick = () => {
+    p.collapsed = !p.collapsed
+    save()
+    render()
+  }
+  left.append(handle, collapseBtn)
 
   const textWrap = document.createElement('div')
-  textWrap.className = 'cardText'
+  textWrap.className = 'cardText' + (p.collapsed ? ' collapsed' : '')
   textWrap.title = '点击复制'
   textWrap.textContent = p.text
   if (p.used) {
@@ -519,13 +644,13 @@ function promptCard(p, g) {
   btns.className = 'cardBtns'
 
   const editBtn = document.createElement('button')
-  editBtn.textContent = '✏️'
+  editBtn.innerHTML = icon('edit', 11)
   editBtn.title = `编辑（${MOD}+Enter 保存，Esc 取消）`
   editBtn.onclick = () => startEditPrompt(p, textWrap)
 
   const favBtn = document.createElement('button')
   const isFav = state.favorites.some(f => f.text === p.text)
-  favBtn.textContent = isFav ? '★' : '☆'
+  favBtn.innerHTML = icon('star', 11, isFav)
   favBtn.className = isFav ? 'favOn' : ''
   favBtn.title = isFav ? '取消收藏' : '收藏'
   favBtn.onclick = () => {
@@ -534,26 +659,164 @@ function promptCard(p, g) {
       toast('已取消收藏')
     } else {
       state.favorites.push({ id: uid(), text: p.text, sourceGroup: g.name, createdAt: Date.now() })
-      toast('已收藏 ★')
+      toast('已收藏')
     }
     save()
     render()
   }
 
   const delBtn = document.createElement('button')
-  delBtn.textContent = '✕'
+  delBtn.innerHTML = icon('close', 11)
   delBtn.title = '删除（进回收站，保留 7 天）'
   delBtn.onclick = () => {
     trashItem('prompt', p.text, g.id, g.name, p.createdAt)
     g.prompts = g.prompts.filter(x => x.id !== p.id)
     save()
     render()
-    toast('已移入回收站 🗑️')
+    toast('已移入回收站')
   }
 
-  btns.append(editBtn, favBtn, delBtn)
-  card.append(textWrap, btns)
+  // 折叠时只保留编辑键：右侧按钮列是卡片高度的下限，留三个就压不下去
+  if (p.collapsed) btns.append(editBtn)
+  else btns.append(editBtn, favBtn, delBtn)
+  card.append(left, textWrap, btns)
   return card
+}
+
+/* ---------- 拖动排序（自绘，不用浏览器原生 DnD：原生拖拽会把文字带出窗口，
+   在这个永远置顶的小窗里等于往下层的 AI 对话框里粘贴内容） ---------- */
+let dragState = null
+
+function startDrag(e, card, g) {
+  if (e.button !== 0 || dragState) return
+  e.preventDefault()
+  const list = $('list')
+  dragState = {
+    card, g, list,
+    listRect: list.getBoundingClientRect(),   // 拖动中列表本身不会动，量一次就够
+    startY: e.clientY,
+    lastY: e.clientY,
+    prevY: e.clientY,
+    dy: 0,
+    moved: false,
+    raf: requestAnimationFrame(dragFrame),
+  }
+  // 监听必须挂在 window 上，不能挂把手、也不能依赖 setPointerCapture：
+  // 换位时卡片要从 DOM 摘下再插回，这会让指针捕获失效，
+  // 之后鼠标一离开那 14px 宽的把手就再也收不到事件，卡片当场定住不动。
+  window.addEventListener('pointermove', onDragMove)
+  window.addEventListener('pointerup', endDrag)
+  window.addEventListener('pointercancel', endDrag)
+  window.addEventListener('blur', endDrag)    // 窗口失焦兜底，避免拖拽状态卡死
+  list.classList.add('dragging-active')
+}
+
+// 鼠标移动只记坐标，一点布局计算都不做。
+// 触控板每秒能发一百多次移动事件，在这里干活必然卡。
+function onDragMove(e) {
+  const s = dragState
+  if (!s) return
+  s.lastY = e.clientY
+  if (!s.moved && Math.abs(e.clientY - s.startY) >= 3) {   // 阈值：轻点不算拖
+    s.moved = true
+    s.card.classList.add('dragging')
+  }
+}
+
+// 真正干活的地方：每个画面帧最多跑一次，且严格「先读后写」。
+// 读全部集中在开头（此时排版是干净的，不会触发重算），写全部放在末尾。
+function dragFrame() {
+  const s = dragState
+  if (!s) return
+  s.raf = requestAnimationFrame(dragFrame)
+  if (!s.moved) return
+
+  // 贴边时自动滚动；只有真滚了才需要继续往下算
+  const want = autoScrollAmount(s)
+  if (want) {
+    const before = s.list.scrollTop
+    s.list.scrollTop = before + want
+    s.startY -= s.list.scrollTop - before   // 列表滚了，卡片要跟着鼠标待在原处
+  } else if (s.lastY === s.prevY) {
+    return                                   // 鼠标没动也没滚，这一帧不用做任何事
+  }
+  s.prevY = s.lastY
+
+  // —— 读：拖动的卡 + 最多两个紧邻的卡，次数不随列表变长而增加 ——
+  const cardRect = s.card.getBoundingClientRect()
+  const nextEl = s.card.nextElementSibling
+  const prevEl = s.card.previousElementSibling
+  const nextMid = nextEl ? midOf(nextEl) : null
+  const prevMid = prevEl ? midOf(prevEl) : null
+
+  // —— 算：纯数学，不碰 DOM。cardRect 含上一帧的位移，先减掉再加本帧的 ——
+  const dy = s.lastY - s.startY
+  const center = cardRect.top - s.dy + dy + cardRect.height / 2
+  const needSwap = (nextMid !== null && center > nextMid) || (prevMid !== null && center < prevMid)
+
+  // —— 写 ——
+  s.dy = dy
+  s.card.style.transform = `translateY(${dy}px)`
+  if (!needSwap) return
+
+  // 一帧之内把该换的位置一次换到位。
+  // 只换一格的话，掉帧或快速拖动时卡片就追不上鼠标，表现成「卡住不动」。
+  for (let guard = 0; guard < 64; guard++) {
+    const r = s.card.getBoundingClientRect()
+    const c = r.top + r.height / 2
+    const nEl = s.card.nextElementSibling
+    const pEl = s.card.previousElementSibling
+    let target = null, after = false
+    if (nEl && c > midOf(nEl)) { target = nEl; after = true }
+    else if (pEl && c < midOf(pEl)) { target = pEl }
+    if (!target) break
+    s.list.insertBefore(s.card, after ? target.nextSibling : target)
+    // 换位后排版变了，补偿 startY 让卡片视觉上停在鼠标下不跳
+    s.startY += s.card.getBoundingClientRect().top - r.top
+    s.dy = s.lastY - s.startY
+    s.card.style.transform = `translateY(${s.dy}px)`
+  }
+}
+
+function midOf(el) {
+  const r = el.getBoundingClientRect()
+  return r.top + r.height / 2
+}
+
+// 拖到列表上下边缘时自动滚动，越靠边越快（用缓存的列表位置，不读 DOM）
+function autoScrollAmount(s) {
+  const EDGE = 40
+  const r = s.listRect
+  if (s.lastY < r.top + EDGE) return -Math.ceil((r.top + EDGE - s.lastY) / 5)
+  if (s.lastY > r.bottom - EDGE) return Math.ceil((s.lastY - (r.bottom - EDGE)) / 5)
+  return 0
+}
+
+function endDrag(commit) {
+  const s = dragState
+  if (!s) return
+  cancelAnimationFrame(s.raf)
+  window.removeEventListener('pointermove', onDragMove)
+  window.removeEventListener('pointerup', endDrag)
+  window.removeEventListener('pointercancel', endDrag)
+  window.removeEventListener('blur', endDrag)
+  s.list.classList.remove('dragging-active')
+  s.card.style.transform = ''
+  s.card.classList.remove('dragging')
+  const { moved, g, list } = s
+  dragState = null
+
+  if (commit === false) { render(); return }   // Esc 取消：按未改动的数组重建
+  if (!moved) return
+
+  const byId = new Map(g.prompts.map(x => [x.id, x]))
+  const next = [...list.children].map(el => byId.get(el.dataset.id)).filter(Boolean)
+  if (next.length === g.prompts.length) {
+    g.prompts = next
+    save()
+  } else {
+    render()   // 对不上就按数据重建，避免顺序错乱
+  }
 }
 
 function startEditPrompt(p, textWrap) {
@@ -591,7 +854,7 @@ function renderFavorites() {
   if (state.favorites.length === 0) {
     const hint = document.createElement('div')
     hint.className = 'hint'
-    hint.textContent = '还没有收藏\n在提示词卡片上点 ⭐ 沉淀到这里'
+    hint.textContent = '还没有收藏\n在提示词卡片上点星标沉淀到这里'
     list.appendChild(hint)
     return
   }
@@ -612,14 +875,14 @@ function renderFavorites() {
     const btns = document.createElement('div')
     btns.className = 'cardBtns'
     const delBtn = document.createElement('button')
-    delBtn.textContent = '✕'
+    delBtn.innerHTML = icon('close', 11)
     delBtn.title = '删除收藏（进回收站，保留 7 天）'
     delBtn.onclick = () => {
       trashItem('fav', f.text, null, f.sourceGroup, f.createdAt)
       state.favorites = state.favorites.filter(x => x.id !== f.id)
       save()
       render()
-      toast('已移入回收站 🗑️')
+      toast('已移入回收站')
     }
     btns.appendChild(delBtn)
 
@@ -660,12 +923,12 @@ function renderTrash() {
     btns.className = 'cardBtns'
 
     const restoreBtn = document.createElement('button')
-    restoreBtn.textContent = '↩︎'
+    restoreBtn.innerHTML = icon('restore', 11)
     restoreBtn.title = t.kind === 'fav' ? '恢复到收藏区' : '恢复到原分组'
     restoreBtn.onclick = () => restoreTrashItem(t)
 
     const delBtn = document.createElement('button')
-    delBtn.textContent = '✕'
+    delBtn.innerHTML = icon('close', 11)
     delBtn.title = '彻底删除'
     delBtn.onclick = () => {
       if (!confirm('彻底删除？无法恢复。')) return
@@ -695,7 +958,7 @@ function restoreTrashItem(t) {
   }
   save()
   render()
-  toast('已恢复 ↩︎')
+  toast('已恢复')
 }
 
 function addPrompt() {
@@ -724,7 +987,9 @@ document.addEventListener('click', (e) => {
   }
 })
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && menuOpen) {
+  if (e.key !== 'Escape') return
+  if (dragState) { endDrag(false); return }
+  if (menuOpen) {
     menuOpen = false
     render()
   }
@@ -745,7 +1010,7 @@ $('pinBtn').onclick = () => {
   window.api.setPinned(state.pinned)
   save()
   applySettings()
-  toast(state.pinned ? '已置顶 📌' : '已取消置顶')
+  toast(state.pinned ? '已置顶' : '已取消置顶')
 }
 
 $('themeBtn').onclick = () => {
@@ -785,6 +1050,9 @@ $('draft').onkeydown = (e) => {
   if (state.pinned === undefined) state.pinned = true
   if (!state.theme) state.theme = 'dark'
   if (!state.trash) state.trash = []
+  $('favBtn').innerHTML = icon('star', 14)
+  $('trashBtn').innerHTML = icon('trash', 14)
+  $('pinBtn').innerHTML = icon('pin', 14)
   // 清掉回收站里超过 7 天的
   const before = state.trash.length
   state.trash = state.trash.filter(t => Date.now() - t.deletedAt < TRASH_KEEP_MS)
