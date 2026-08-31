@@ -817,7 +817,7 @@ function promptCard(p, g) {
       state.favorites = state.favorites.filter(f => f.text !== p.text)
       toast('已取消收藏')
     } else {
-      state.favorites.push({ id: uid(), text: p.text, sourceGroup: g.name, createdAt: Date.now() })
+      state.favorites.unshift({ id: uid(), text: p.text, sourceGroup: g.name, createdAt: Date.now() })
       toast('已收藏')
     }
     save()
@@ -1241,12 +1241,15 @@ function renderFavorites() {
     list.appendChild(hint)
     return
   }
-  for (const f of [...state.favorites].reverse()) {
+  for (const f of state.favorites) {
     const card = document.createElement('div')
-    card.className = 'card'
+    card.className = 'card' + (f.collapsed ? ' collapsed' : '')
+    card.dataset.id = f.id
+
+    const left = buildLeftRail(card, f, state.favorites)
 
     const textWrap = document.createElement('div')
-    textWrap.className = 'cardText'
+    textWrap.className = 'cardText' + (f.collapsed ? ' collapsed' : '')
     textWrap.title = '点击复制'
     textWrap.textContent = f.text
     const meta = document.createElement('div')
@@ -1269,7 +1272,7 @@ function renderFavorites() {
     }
     btns.appendChild(delBtn)
 
-    card.append(textWrap, btns)
+    card.append(left, textWrap, btns)
     list.appendChild(card)
   }
 }
@@ -1334,7 +1337,7 @@ function restoreTrashItem(t) {
     const g = state.todoGroups.find(x => x.id === t.sourceGroupId) || state.todoGroups[0]
     g.todos.push({ id: uid(), text: t.text, createdAt: t.createdAt, done: false, due: t.due })
   } else if (t.kind === 'fav') {
-    state.favorites.push({ id: uid(), text: t.text, sourceGroup: t.sourceGroup, createdAt: t.createdAt })
+    state.favorites.unshift({ id: uid(), text: t.text, sourceGroup: t.sourceGroup, createdAt: t.createdAt })
   } else {
     let g = state.groups.find(x => x.id === t.sourceGroupId)
       || state.groups.find(x => x.name === t.sourceGroup)
@@ -1469,6 +1472,13 @@ $('draft').onkeydown = (e) => {
   if (!state.mode) state.mode = 'prompt'
   if (!state.todoGroups) state.todoGroups = QUADRANTS.map(q => ({ id: q.id, name: q.name, todos: [] }))
   if (!state.activeTodoGroupId) state.activeTodoGroupId = state.todoGroups[0].id
+  // 收藏区原先是倒序显示的；现在可以手动拖动排序了，改为按数组顺序显示。
+  // 这里把存储顺序反转一次，保证升级后看到的排列跟原来一模一样。
+  if (!state.favOrdered) {
+    state.favorites.reverse()
+    state.favOrdered = true
+    save()
+  }
   $('favBtn').innerHTML = icon('star', 14)
   $('trashBtn').innerHTML = icon('trash', 14)
   $('pinBtn').innerHTML = icon('pin', 14)
