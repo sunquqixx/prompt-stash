@@ -347,6 +347,23 @@
   .dateChip.over { color: var(--due-over); }
   .dateChip.today { color: var(--due-today); }
   .dateChip.soon { color: var(--due-soon); }
+  /* 右键菜单：把待办挪到其他象限。同样画在窗口层，避免被列表区裁掉 */
+  .ctxMenu {
+    position: fixed;
+    z-index: 100;
+    min-width: 140px;
+    max-width: 220px;
+    padding: 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+  .ctxTitle {
+    padding: 4px 8px 6px;
+    font-size: 10px;
+    color: var(--hint);
+  }
   /* 小日历：画在窗口层（fixed），否则会被可滚动的列表区裁掉 */
   .datePop {
     position: fixed;
@@ -890,6 +907,7 @@ function todoCard(t, g) {
   card.dataset.id = t.id
 
   const left = buildLeftRail(card, t, g.todos)
+  card.oncontextmenu = (e) => { e.preventDefault(); openMoveMenu(e, t, g) }
 
   const textWrap = document.createElement('div')
   textWrap.className = 'cardText' + (t.collapsed ? ' collapsed' : '') + (t.done ? ' doneText' : '')
@@ -954,6 +972,62 @@ function dateChip(t) {
   return chip
 }
 
+/* 右键待办 → 挪到其他象限 */
+let ctxMenu = null
+
+function closeCtxMenu() {
+  if (!ctxMenu) return
+  ctxMenu.remove()
+  ctxMenu = null
+  document.removeEventListener('click', outsideCloseCtx)
+}
+function outsideCloseCtx(e) {
+  if (ctxMenu && !ctxMenu.contains(e.target)) closeCtxMenu()
+}
+
+function openMoveMenu(e, t, from) {
+  closeCtxMenu()
+  closeDatePicker()
+  const others = state.todoGroups.filter(g => g.id !== from.id)
+  if (!others.length) return
+
+  const pop = document.createElement('div')
+  pop.className = 'ctxMenu'
+  pop.onclick = (ev) => ev.stopPropagation()   // 同小日历：内部点击不外传，免得被「点到外面」误判
+
+  const title = document.createElement('div')
+  title.className = 'ctxTitle'
+  title.textContent = '移动到'
+  pop.appendChild(title)
+
+  for (const g of others) {
+    const row = document.createElement('div')
+    row.className = 'menuItem'
+    const name = document.createElement('span')
+    name.className = 'miName'
+    name.textContent = g.name
+    row.appendChild(name)
+    row.onclick = () => {
+      from.todos = from.todos.filter(x => x.id !== t.id)
+      g.todos.push(t)                          // 放到目标象限末尾，与新增待办一致
+      save()
+      closeCtxMenu()
+      render()
+      toast('已移到「' + g.name + '」')
+    }
+    pop.appendChild(row)
+  }
+
+  document.body.appendChild(pop)
+  // 贴着鼠标弹出，夹在窗口内
+  const w = pop.offsetWidth, h = pop.offsetHeight
+  pop.style.left = Math.min(Math.max(4, e.clientX), innerWidth - w - 4) + 'px'
+  pop.style.top = Math.min(Math.max(4, e.clientY), innerHeight - h - 4) + 'px'
+
+  ctxMenu = pop
+  setTimeout(() => document.addEventListener('click', outsideCloseCtx), 0)
+}
+
 const ymd = (d) => d.getFullYear() + '-'
   + String(d.getMonth() + 1).padStart(2, '0') + '-'
   + String(d.getDate()).padStart(2, '0')
@@ -973,6 +1047,7 @@ function outsideCloseDate(e) {
 /* 小日历：打开就停在当月，点一下日子即可；年月只有跨月时才需要动 */
 function openDatePicker(t, chip) {
   closeDatePicker()
+  closeCtxMenu()
   const base = t.due ? new Date(t.due + 'T00:00:00') : new Date()
   let viewY = base.getFullYear(), viewM = base.getMonth()
 
@@ -1380,6 +1455,7 @@ document.addEventListener('click', (e) => {
 })
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return
+  if (ctxMenu) { closeCtxMenu(); return }
   if (datePop) { closeDatePicker(); return }
   if (dragState) { endDrag(false); return }
   if (menuOpen) {

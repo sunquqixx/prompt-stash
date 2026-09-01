@@ -1,6 +1,6 @@
 {
   "name": "prompt-stash",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "始终置顶的候选提示词暂存小工具",
   "main": "main.js",
   "scripts": {
